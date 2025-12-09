@@ -1,0 +1,134 @@
+Weekly Log — Week 5 (ending 2025-12-08)
+
+Name: Sai Surya Cherupally
+Project: Dataset Creation using Unitree Go1 Robot
+
+________________________________________
+
+What I Accomplished This Week
+
+Week 5 focused on finalizing the dataset format following industry best practices (KITTI, nuScenes), discovering the dual return mode in the LiDAR data, and preparing for project submission.
+
+________________________________________
+
+Technical Implementation
+
+1. Dataset Format Research
+
+Researched industry-standard dataset formats:
+- KITTI: Binary point clouds [x, y, z, reflectance] as float32, separate timestamp files
+- nuScenes: Relational database with calibration and sensor metadata
+
+Decision: Adopted KITTI-style binary format for compatibility with existing tools.
+
+2. DUAL RETURN Discovery
+
+Major finding: The RoboSense Helios-16 is operating in DUAL RETURN mode.
+
+Previous understanding:
+- Thought: 16 measurements per block (one per laser beam)
+- Result: ~6,600 points per frame
+
+Actual structure discovered:
+- Reality: 32 measurements per block (16 beams × 2 returns)
+- Measurements 0-15: STRONGEST return for each beam
+- Measurements 16-31: LAST return for each beam
+- Result: ~13,600 points per frame (2x more data!)
+
+Proof from packet analysis:
+```
+Block 0 Analysis:
+  Beam 0: Strongest=5.069m, Last=5.095m (26mm difference)
+  Beam 1: Strongest=1.026m, Last=0.949m (77mm difference)
+```
+
+3. extract_dataset_v2.py Created
+
+New KITTI-style extraction script with:
+- DUAL RETURN support (extracts both strongest and last returns)
+- Binary .bin files: Nx5 float32 [x, y, z, intensity_norm, return_type]
+- Raw CSV backup for verification
+- Timestamp files (Unix epoch, 6 decimal places)
+- Calibration placeholder file
+- Auto-generated README per session
+
+4. Combined CSV Creation
+
+Created single unified dataset file:
+- Filename: dataset_combined.csv
+- Size: 4.9 GB
+- Rows: 44,311,369 LiDAR points
+- Columns: session, frame_index, camera_timestamp_ms, camera_file, 
+           packet_timestamp, beam, return_type, azimuth_raw, distance_raw, intensity
+
+All values are TRUE RAW sensor values - nothing synthetic or assumed.
+
+5. Dataset Statistics
+
+Final dataset:
+| Session | Location | Frames | LiDAR Points |
+|---------|----------|--------|--------------|
+| 20251206_132136 | 4th Floor Hallway | 576 | 7,870,298 |
+| 20251206_154822 | 4th Floor Lounge | 535 | 7,468,838 |
+| 20251206_161536 | 5th Floor Hallway | 737 | 9,764,524 |
+| 20251206_162223 | 3rd Floor Hallway | 955 | 12,993,901 |
+| 20251207_112819 | Mlab | 505 | 6,213,808 |
+| TOTAL | | 3,308 | 44,311,369 |
+
+6. Demo Scripts Created
+
+- show_sample_data.py: Displays sample camera frame and LiDAR statistics
+- simple_model_demo.py: Train/test split (80/20) demonstration
+
+Train/Test Split Results:
+- Train: 4 sessions (2,803 frames, 84.7%)
+- Test: 1 session - Mlab (505 frames, 15.3%)
+- Consistency: Test set shows similar characteristics to training set
+
+________________________________________
+
+Files Created/Modified This Week
+
+| File | Purpose |
+|------|---------|
+| extract_dataset_v2.py | KITTI-style extraction with dual return |
+| create_combined_csv.py | Single CSV generation |
+| show_sample_data.py | Sample data visualization |
+| simple_model_demo.py | Train/test split demo |
+| VIDEO_SCRIPT.md | Recording script for submission |
+| README.md | Updated documentation |
+| requirements.txt | Updated with scapy |
+
+________________________________________
+
+Key Learnings
+
+1. Always verify raw data format - the dual return mode was hidden in the packet structure
+2. Industry-standard formats (KITTI) improve compatibility and reproducibility
+3. TRUE RAW VALUES are essential - avoid any transformations that can't be verified
+4. Backup raw data in human-readable format (CSV) alongside binary for verification
+
+________________________________________
+
+Project Completion Status
+
+✓ Hardware setup (Unitree Go1 + Camera + LiDAR)
+✓ Recording system (app.py Flask web interface)
+✓ LiDAR packet parsing (RoboSense Helios-16 protocol)
+✓ Dual return mode support
+✓ Time-based synchronization
+✓ KITTI-style dataset format
+✓ Combined CSV with 44M points
+✓ Train/test split demonstration
+✓ Documentation and weekly logs
+✓ Video script prepared
+
+________________________________________
+
+Submission Checklist
+
+1. Development Logs: Weekly1-5_log.txt ✓
+2. Description: README.md updated ✓
+3. Documentation: Code comments in all scripts ✓
+4. Reproducibility: requirements.txt with all dependencies ✓
+5. Video: Script ready, demo scripts tested ✓

@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Unitree Go1 Data Collection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .control-card {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+            max-width: 900px;
+            margin: 0 auto 20px;
+        }
+
+        .control-header {
+            padding: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+        }
+
+        .control-header h2 {
+            font-size: 2em;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .control-body {
+            padding: 30px;
+        }
+
+        .sensor-selection {
+            margin-bottom: 25px;
+            text-align: center;
+        }
+
+        .sensor-selection label {
+            display: block;
+            margin-bottom: 10px;
+            color: #333;
+            font-size: 1.1em;
+        }
+
+        .sensor-selection select {
+            width: 100%;
+            max-width: 400px;
+            padding: 12px 20px;
+            font-size: 1.1em;
+            border: 2px solid #667eea;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sensor-selection select:hover {
+            border-color: #764ba2;
+            box-shadow: 0 4px 10px rgba(102, 126, 234, 0.2);
+        }
+
+        .sensor-selection select:focus {
+            outline: none;
+            border-color: #764ba2;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .status-label {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .session-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .status-badge {
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            background: rgba(255,255,255,0.3);
+        }
+
+        .status-badge.recording {
+            background: #ff3b3b;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .logs-section {
+            margin-top: 25px;
+        }
+
+        .controls {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 15px 25px;
+            font-size: 1em;
+            font-weight: bold;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 15px rgba(0,0,0,0.2);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-start {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            color: white;
+        }
+
+        .btn-stop {
+            background: linear-gradient(135deg, #eb3349 0%, #f45c43 100%);
+            color: white;
+        }
+
+        .btn-save {
+            background: linear-gradient(135deg, #FA8BFF 0%, #2BD2FF 50%, #2BFF88 100%);
+            color: white;
+        }
+
+        .session-info {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+
+        .session-info strong {
+            color: #667eea;
+        }
+
+        .log-container {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .log-container::-webkit-scrollbar-track {
+            background: #2d2d2d;
+        }
+
+        .log-container::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 4px;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 4px;
+        }
+
+        .log-entry:hover {
+            background: #2d2d2d;
+        }
+
+        .timestamp {
+            color: #4ec9b0;
+        }
+
+        footer {
+            text-align: center;
+            color: white;
+            margin-top: 30px;
+            opacity: 0.8;
+        }
+
+        .icon {
+            font-size: 1.3em;
+        }
+
+        @media (max-width: 768px) {
+            .sensors-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            header h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🤖 Unitree Go1 Data Collection Interface</h1>
+            <p>Control camera and LiDAR recording with simple clicks</p>
+        </header>
+
+        <!-- Unified Control Card -->
+        <div class="control-card">
+            <div class="control-header">
+                <h2><span class="icon">🎮</span> Recording Control</h2>
+            </div>
+            <div class="control-body">
+                <!-- Sensor Selection -->
+                <div class="sensor-selection">
+                    <label for="sensor-select">
+                        <strong>Select Sensor:</strong>
+                    </label>
+                    <select id="sensor-select" onchange="updateSensorSelection()">
+                        <option value="both">📹 + 📡 Both (Camera + LiDAR)</option>
+                        <option value="camera">📹 Camera Only</option>
+                        <option value="lidar">📡 LiDAR Only</option>
+                    </select>
+                </div>
+
+                <!-- Status Display -->
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="status-label">� Camera:</span>
+                        <span class="status-badge" id="camera-status">Idle</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">📡 LiDAR:</span>
+                        <span class="status-badge" id="lidar-status">Idle</span>
+                    </div>
+                </div>
+
+                <!-- Session Info -->
+                <div class="session-info-grid">
+                    <div class="session-info" id="camera-session">
+                        <strong>📹 Camera Session:</strong> <span id="camera-session-name">None</span>
+                    </div>
+                    <div class="session-info" id="lidar-session">
+                        <strong>📡 LiDAR Session:</strong> <span id="lidar-session-name">None</span>
+                    </div>
+                </div>
+
+                <!-- Unified Controls -->
+                <div class="controls">
+                    <button class="btn-start" id="btn-start" onclick="startRecording()">
+                        ▶ Start Recording
+                    </button>
+                    <button class="btn-stop" id="btn-stop" onclick="stopRecording()" disabled>
+                        ⏹ Stop Recording
+                    </button>
+                    <button class="btn-save" id="btn-save" onclick="saveRecording()" disabled>
+                        💾 Save & Transfer
+                    </button>
+                </div>
+
+                <!-- Logs Section -->
+                <div class="logs-section">
+                    <h3 style="margin-bottom: 10px; color: #333;">📋 Activity Log</h3>
+                    <div class="log-container" id="combined-log">
+                        <div class="log-entry">Ready to record. Select a sensor and click Start.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            <p>CAP6415 Fall 2025 — Dataset Collection using Unitree Go1 Robot</p>
+            <p>Sai Surya Cherupally</p>
+        </footer>
+    </div>
+
+    <script>
+        let selectedSensor = 'both'; // Default to both sensors
+        
+        // Poll status every 2 seconds
+        setInterval(updateStatus, 2000);
+        
+        // Update status immediately on load
+        updateStatus();
+
+        function updateSensorSelection() {
+            selectedSensor = document.getElementById('sensor-select').value;
+            console.log('Selected sensor:', selectedSensor);
+        }
+
+        async function updateStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                
+                // Update individual sensor statuses
+                updateSensorStatus('camera', data.camera);
+                updateSensorStatus('lidar', data.lidar);
+                
+                // Update combined log
+                updateCombinedLog(data);
+                
+                // Update button states based on recording status
+                updateButtonStates(data);
+                
+            } catch (error) {
+                console.error('Failed to fetch status:', error);
+            }
+        }
+
+        function updateSensorStatus(sensor, data) {
+            const statusBadge = document.getElementById(`${sensor}-status`);
+            const sessionName = document.getElementById(`${sensor}-session-name`);
+            
+            // Update status badge
+            if (data.recording) {
+                statusBadge.textContent = '🔴 Recording';
+                statusBadge.classList.add('recording');
+            } else {
+                statusBadge.textContent = 'Idle';
+                statusBadge.classList.remove('recording');
+            }
+            
+            // Update session name
+            sessionName.textContent = data.session_name || 'None';
+        }
+
+        function updateCombinedLog(data) {
+            const logContainer = document.getElementById('combined-log');
+            const allLogs = [];
+            
+            // Combine logs from both sensors
+            if (data.camera.log && data.camera.log.length > 0) {
+                data.camera.log.forEach(log => {
+                    allLogs.push({ type: 'camera', text: log });
+                });
+            }
+            
+            if (data.lidar.log && data.lidar.log.length > 0) {
+                data.lidar.log.forEach(log => {
+                    allLogs.push({ type: 'lidar', text: log });
+                });
+            }
+            
+            if (allLogs.length > 0) {
+                logContainer.innerHTML = allLogs.map(log => {
+                    const icon = log.type === 'camera' ? '📹' : '📡';
+                    return `<div class="log-entry">${icon} ${escapeHtml(log.text)}</div>`;
+                }).join('');
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+        }
+
+        function updateButtonStates(data) {
+            const startBtn = document.getElementById('btn-start');
+            const stopBtn = document.getElementById('btn-stop');
+            const saveBtn = document.getElementById('btn-save');
+            
+            const cameraRecording = data.camera.recording;
+            const lidarRecording = data.lidar.recording;
+            const anyRecording = cameraRecording || lidarRecording;
+            
+            const cameraSession = data.camera.session_name;
+            const lidarSession = data.lidar.session_name;
+            const anySession = cameraSession || lidarSession;
+            
+            // Start button disabled if anything is recording
+            startBtn.disabled = anyRecording;
+            
+            // Stop button enabled if anything is recording
+            stopBtn.disabled = !anyRecording;
+            
+            // Save button enabled if not recording and there's a session
+            saveBtn.disabled = anyRecording || !anySession;
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function startRecording() {
+            const sensor = selectedSensor;
+            
+            if (sensor === 'both') {
+                // Use synchronized endpoint - connects to both first, then starts together
+                await sendCommand('/api/both/start', 'POST');
+            } else if (sensor === 'camera') {
+                await sendCommand('/api/camera/start', 'POST');
+            } else if (sensor === 'lidar') {
+                await sendCommand('/api/lidar/start', 'POST');
+            }
+            
+            updateStatus();
+        }
+
+        async function stopRecording() {
+            const sensor = selectedSensor;
+            
+            if (sensor === 'both') {
+                // Use synchronized endpoint - stops both at the same time
+                await sendCommand('/api/both/stop', 'POST');
+            } else if (sensor === 'camera') {
+                await sendCommand('/api/camera/stop', 'POST');
+            } else if (sensor === 'lidar') {
+                await sendCommand('/api/lidar/stop', 'POST');
+            }
+            
+            updateStatus();
+        }
+
+        let isSaving = false;  // Track if save is in progress
+
+        async function saveRecording() {
+            if (isSaving) {
+                alert('Save already in progress! Please wait...');
+                return;
+            }
+            
+            isSaving = true;
+            const saveBtn = document.getElementById('btn-save');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = '⏳ Saving... Please Wait';
+            saveBtn.disabled = true;
+            saveBtn.style.backgroundColor = '#ffc107';
+            
+            const sensor = selectedSensor;
+            
+            try {
+                if (sensor === 'both') {
+                    // Save both - LiDAR is fast, Camera takes time
+                    // Run in parallel but camera will take longer
+                    await Promise.all([
+                        sendCommand('/api/camera/save', 'POST'),
+                        sendCommand('/api/lidar/save', 'POST')
+                    ]);
+                } else if (sensor === 'camera') {
+                    await sendCommand('/api/camera/save', 'POST');
+                } else if (sensor === 'lidar') {
+                    await sendCommand('/api/lidar/save', 'POST');
+                }
+                
+                saveBtn.textContent = '✅ Saved!';
+                saveBtn.style.backgroundColor = '#28a745';
+                setTimeout(() => {
+                    saveBtn.textContent = originalText;
+                    saveBtn.style.backgroundColor = '';
+                }, 3000);
+            } catch (error) {
+                saveBtn.textContent = '❌ Error';
+                saveBtn.style.backgroundColor = '#dc3545';
+            } finally {
+                isSaving = false;
+                updateStatus();
+            }
+        }
+
+        async function sendCommand(endpoint, method) {
+            try {
+                const response = await fetch(endpoint, { method });
+                const data = await response.json();
+                
+                if (!data.success) {
+                    console.error(`Error from ${endpoint}:`, data.message);
+                }
+                
+                return data;
+                
+            } catch (error) {
+                console.error(`Request failed for ${endpoint}:`, error.message);
+                return { success: false, message: error.message };
+            }
+        }
+    </script>
+</body>
+</html>
