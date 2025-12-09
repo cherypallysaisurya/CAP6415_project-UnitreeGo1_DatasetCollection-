@@ -1,0 +1,18 @@
+# Unitree Go1 Dataset Collection - Dependencies
+# Install with: pip install -r requirements.txt
+
+# Web interface
+Flask==3.0.0
+
+# SSH connection to robot
+paramiko==3.4.0
+cryptography==41.0.7
+
+# Image processing
+opencv-python==4.8.1.78
+
+# Numerical operations
+numpy==1.26.2
+
+# PCAP parsing for LiDAR data
+scapy==2.5.0

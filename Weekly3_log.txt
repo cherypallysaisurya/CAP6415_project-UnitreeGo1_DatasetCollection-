@@ -1,0 +1,199 @@
+Weekly Log — Week 3 (ending 2025-11-23)
+
+Name: Sai Surya Cherupally
+Project: Dataset Creation using Unitree Go1 Robot
+
+________________________________________
+
+What I Accomplished This Week
+
+This week focused on debugging, testing, and refining the data collection system based on Week 2's implementation. Key activities included system validation, error analysis, and preparation for large-scale dataset collection.
+
+________________________________________
+
+Technical Work Completed
+
+1. System Testing and Validation
+• Conducted multiple test recordings to validate the web interface
+• Tested camera and LiDAR recording independently and synchronized
+• Verified file transfer reliability across multiple sessions
+• Monitored system stability over extended recording periods
+
+2. Dataset Quality Analysis
+• Analyzed existing recorded files (11 camera recordings, 1 LiDAR capture)
+• Identified 5 corrupted MP4 files from early testing phase
+• Validated 6 successful recordings with proper file structure
+• Documented file sizes and recording characteristics
+
+3. Error Investigation
+• Investigated MP4 file corruption issues in detail
+• Analyzed file structure of corrupted vs. valid recordings
+• Identified missing moov atom as root cause of playback failures
+• Researched FFmpeg finalization process and MP4 container format
+
+4. Code Refinement
+• Reviewed SSH connection handling and process management
+• Analyzed timing issues in file finalization
+• Studied FFmpeg signal handling (SIGINT vs SIGTERM)
+• Researched best practices for remote process control
+
+5. Documentation Updates
+• Updated README with troubleshooting section
+• Documented known issues and workarounds
+• Created internal notes on system behavior
+• Prepared technical documentation for future improvements
+
+________________________________________
+
+Challenges Encountered
+
+1. MP4 File Corruption
+Problem: Several recorded videos showed non-zero file sizes but would not play in media players. Error code 0xc00d36c4 indicated container format issues.
+
+Investigation:
+• Used binary analysis to examine file headers
+• Confirmed valid MP4 ftyp atom present
+• Discovered missing moov atom (movie metadata)
+• Identified premature FFmpeg termination as cause
+
+Root Cause: FFmpeg was being terminated before it could write the moov atom at the end of the file. The 5-second wait time after sending SIGINT was insufficient for the SSH connection to properly finalize the file.
+
+2. Inconsistent Recording Success Rate
+• Early recordings (Nov 11) had 0% success rate (5 failures)
+• Later recordings (Nov 11-16) had 100% success rate (6 successes)
+• Timing and process handling improvements made the difference
+
+3. Remote Debugging Limitations
+• Cannot directly observe FFmpeg output in real-time
+• SSH connection state affects process behavior
+• File validation must happen after transfer
+• Limited visibility into robot-side processes
+
+________________________________________
+
+Dataset Status
+
+Current Dataset Inventory:
+• Total camera recordings: 11 files
+  - Valid recordings: 6 files (958 KB to 3.25 MB)
+  - Corrupted recordings: 5 files (0 bytes - early testing)
+• Total LiDAR recordings: 1 file
+• Recording dates: November 11-16, 2025
+
+Valid Recording Statistics:
+• File sizes: 768 KB to 3.25 MB
+• Average size: ~1.8 MB per recording
+• Format: H.264 MP4, 1280×720, 30fps
+• Duration: Approximately 20 seconds each
+
+________________________________________
+
+System Performance Metrics
+
+Recording Workflow Time:
+• Manual SSH method: 5-10 minutes per session
+• Web interface method: 30 seconds per session
+• Efficiency improvement: 10-20× faster
+
+Success Rate (After Week 2 fixes):
+• Camera recordings: 100% (6/6 successful)
+• LiDAR recordings: 100% (1/1 successful)
+• File transfers: 100% successful
+• Overall system reliability: High
+
+________________________________________
+
+Research and Planning
+
+1. Investigated MP4 Container Format
+• Studied ISO base media file format specification
+• Learned about moov, mdat, ftyp atoms
+• Researched fragmented MP4 vs. standard MP4
+• Explored faststart flag for web streaming
+
+2. FFmpeg Best Practices
+• Researched proper signal handling for graceful shutdown
+• Studied -movflags options (faststart, frag_keyframe)
+• Investigated codec selection and encoding parameters
+• Reviewed remote execution patterns
+
+3. Dataset Requirements Analysis
+• Defined minimum dataset size for research purposes
+• Planned recording scenarios (indoor, outdoor, different terrains)
+• Considered synchronization requirements for sensor fusion
+• Researched SLAM dataset standards
+
+4. Future Processing Pipeline
+• Researched dual-fisheye to equirectangular conversion
+• Investigated PCAP parsing tools for LiDAR data
+• Explored ROS bag format for robotics datasets
+• Planned metadata schema for dataset organization
+
+________________________________________
+
+Next Steps (Week 4)
+
+1. Fix MP4 Corruption Issue
+• Implement -movflags faststart to write moov atom at file start
+• Increase finalization wait time from 5 to 8 seconds
+• Add process verification before closing SSH connection
+• Implement file validation before transfer
+
+2. Large-Scale Data Collection
+• Plan recording sessions across different environments
+• Create recording schedule and scenarios
+• Aim for 20-50 synchronized camera+LiDAR sessions
+• Document environmental conditions for each recording
+
+3. Dataset Organization
+• Create results folder structure
+• Generate metadata files for each recording
+• Create dataset statistics and visualizations
+• Prepare sample frames and point cloud visualizations
+
+4. Documentation Completion
+• Add comprehensive code comments
+• Create usage guide with examples
+• Document installation and dependencies
+• Prepare for final demo video
+
+________________________________________
+
+Lessons Learned
+
+1. File Format Validation is Critical
+• Cannot rely on file size alone to verify recording success
+• Need to validate internal structure (moov atom presence)
+• Implement validation before transfer, not after
+
+2. Remote Process Management is Complex
+• SSH connection state affects background processes
+• Signal handling differs from local execution
+• Need adequate wait times for process finalization
+• Process verification is essential
+
+3. Iterative Testing Reveals Issues
+• Early failures provided valuable debugging information
+• Multiple test recordings helped identify patterns
+• Success rate improved dramatically after understanding root causes
+
+4. Documentation During Development
+• Weekly logs help track progress and decisions
+• Technical notes aid in debugging and future improvements
+• Clear documentation makes system maintainable
+
+________________________________________
+
+Time Allocation This Week
+
+• System testing and validation: 6 hours
+• Error investigation and analysis: 4 hours
+• Code review and refinement planning: 3 hours
+• Research (MP4 format, FFmpeg, SLAM datasets): 4 hours
+• Documentation and weekly log: 3 hours
+
+Total: ~20 hours
+
+________________________________________
+
+Generated: 2025-11-23
