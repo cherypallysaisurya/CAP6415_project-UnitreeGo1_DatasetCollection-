@@ -1,0 +1,19 @@
+{
+  "folders": [
+    { "path": "." }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/model_results": true,
+      "**/sample_outputs": true
+    },
+    "search.exclude": {
+      "**/model_results": true,
+      "**/sample_outputs": true
+    },
+    "files.watcherExclude": {
+      "**/model_results/**": true,
+      "**/sample_outputs/**": true
+    }
+  }
+}

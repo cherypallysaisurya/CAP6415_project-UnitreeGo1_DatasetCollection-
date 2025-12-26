@@ -13,11 +13,70 @@
         "**/__pycache__": true,
         "**/*.pyc": true
     },
-    "search.exclude": {
-        "**/.venv/**": true,
-        "**/node_modules/**": true,
-        "**/__pycache__/**": true
-    },
+        "search.exclude": {
+            "**/.venv/**": true,
+            "**/node_modules/**": true,
+            "**/__pycache__/**": true
+        },
+        "files.watcherExclude": {
+            "**/.git/objects/**": true,
+            "**/.git/subtree-cache/**": true,
+            "**/.venv/**": true,
+            "**/node_modules/**": true,
+            "**/__pycache__/**": true,
+            "**/*.pyc": true
+        },
+        "files.exclude": {
+            "**/.git": true,
+            "**/.svn": true,
+            "**/.hg": true,
+            "**/CVS": true,
+            "**/.DS_Store": true,
+            "**/node_modules": true,
+            "**/env": true,
+            "**/venv": true,
+            "**/__pycache__": true,
+            "**/build": true,
+            "**/dist": true,
+            "**/output": true,
+            "**/log": true,
+            "**/logs": true,
+            "**/temp": true,
+            "**/tmp": true,
+            "**/.vscode": false
+        },
+        "search.exclude": {
+            "**/node_modules": true,
+            "**/env": true,
+            "**/venv": true,
+            "**/__pycache__": true,
+            "**/build": true,
+            "**/dist": true,
+            "**/output": true,
+            "**/log": true,
+            "**/logs": true,
+            "**/temp": true,
+            "**/tmp": true
+        },
+        "files.watcherExclude": {
+            "**/node_modules/**": true,
+            "**/env/**": true,
+            "**/venv/**": true,
+            "**/__pycache__/**": true,
+            "**/build/**": true,
+            "**/dist/**": true,
+            "**/output/**": true,
+            "**/log/**": true,
+            "**/logs/**": true,
+            "**/temp/**": true,
+            "**/tmp/**": true
+        },
+        "workbench.extensionHost.maxMemory": 4096,
+        "python.analysis.indexing": false,
+        "python.analysis.memory.keepLibraryAst": false,
+        "explorer.autoReveal": false,
+        "explorer.compactFolders": false
+    }
     "python.analysis.exclude": [
         "**/.venv/**"
     ]
