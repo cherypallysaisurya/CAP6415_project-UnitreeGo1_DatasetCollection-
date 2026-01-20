@@ -1,0 +1,166 @@
+Weekly Log — Week 2 (ending 2025-11-16)
+
+Name: Sai Surya Cherupally
+Project: Dataset Creation using Unitree Go1 Robot
+
+________________________________________
+
+What I Built This Week
+
+Developed a web-based control interface for automating camera and LiDAR data collection on the Unitree Go1 robot. The interface includes:
+
+• Unified Control Panel – Start/Stop/Save workflow with sensor selection (Camera, LiDAR, or Both)
+• Real-time Monitoring – Live recording status, active session tracking, timestamped logs
+• Automated File Transfer – SCP-based capture → transfer → local organization
+• Remote Control – Full SSH-based execution of camera/LiDAR operations without manual terminal usage
+
+________________________________________
+
+Technical Implementation
+
+Architecture Overview
+
+Frontend (HTML/CSS/JavaScript)
+• Responsive single-page UI
+• REST API polling every 2 seconds
+• Dynamic UI updates based on sensor state
+• Sensor selection directing calls to different endpoints
+
+Backend (Flask + Python)
+• REST endpoints for camera and LiDAR:
+  /api/camera/start, /api/camera/stop, /api/camera/save and LiDAR equivalents
+• Internal state tracking: active PIDs, SSH connections, file paths
+• Paramiko used for all SSH/SFTP operations
+
+Configuration
+• JSON config for robot IPs: camera (192.168.123.13), LiDAR (192.168.123.15)
+• Camera: 1280×720, MJPEG, /dev/video0
+• LiDAR: UDP ports 6699/7788, PCAP via tcpdump
+
+________________________________________
+
+Technology Stack
+
+• Flask 3.0.0
+• Paramiko 3.4.0
+• FFmpeg (camera capture via v4l2)
+• tcpdump (LiDAR packet capture)
+• SFTP for secure transfers
+
+________________________________________
+
+Workflow
+
+1. User selects sensor(s) → hits Start
+2. Frontend sends POST to backend
+3. Backend creates SSH session via Paramiko
+4. Camera/LiDAR capture runs in background through remote command
+5. PID stored for later termination
+6. Stop → SIGTERM → wait for file finalization
+7. Save → SFTP transfer → size verification → remote cleanup
+
+________________________________________
+
+Technical Challenges and Solutions
+
+1. FFmpeg exiting instantly (no output file)
+
+Cause: FFmpeg run via SSH needed -nostdin and proper shell wrapping.
+
+Fix:
+• Added -nostdin
+• Wrapped in sh -c '...'
+• Added sleep 2 before ffmpeg
+• Removed nohup, used background process &
+
+Final command:
+sh -c 'sleep 2; ffmpeg -y -nostdin -f v4l2 -input_format mjpeg -video_size 1280x720 -i /dev/video0 /home/unitree/output.mp4 >> /tmp/log 2>&1 & echo $!'
+
+________________________________________
+
+2. "Device or resource busy" on /dev/video0
+
+Cause: Zombie ffmpeg processes from failed attempts.
+
+Fix:
+• Added cleanup: pkill -9 ffmpeg, killall -9 ffmpeg, fuser -k /dev/video0
+• Switched to SIGTERM
+• Fallback force kill if ffmpeg doesn't stop
+• Increased wait time before saving file
+
+________________________________________
+
+3. Corrupted MP4 files (0xc00d36c4)
+
+Cause: The MP4 footer wasn't written due to abrupt termination.
+
+Fix:
+• Use SIGTERM instead of SIGINT
+• Added 4-second finalization delay
+• Verified file size + existence
+• Tail logs on failure for debugging
+
+________________________________________
+
+4. File transfer issues (0-byte files or incomplete copies)
+
+Fix:
+• Verified file via ls -lh before transfer
+• Verified size after SFTP
+• Added logging for every transfer step
+• Added ffmpeg log dump on errors
+
+________________________________________
+
+Why This Interface Matters
+
+Efficiency
+• Previously: manual SSH commands, repeated mistakes, slow transfer → 5–10 mins/session
+• Now: Start → Stop → Save → 30 seconds
+• ~10× faster dataset collection
+
+Research Advantages
+• Consistent sensor parameters
+• Camera+LiDAR synchronous capture
+• Automatic timestamped filenames
+• Scales to large dataset creation
+
+Dataset Structure
+
+dataset/
+├── camera/
+│   ├── camera_20251116_143052.mp4
+│   ├── camera_20251116_143215.mp4
+└── lidar/
+    ├── lidar_20251116_143052.pcap
+    ├── lidar_20251116_143215.pcap
+
+Future Applications
+• Training ML models (vision, SLAM, sensor fusion)
+• Equirectangular conversion pipelines
+• PCAP parsing automation
+• Quality-controlled dataset generation
+
+________________________________________
+
+Next Steps (Week 3)
+
+1. NTP-based timestamp synchronization
+2. Dual-fisheye → equirectangular conversion (FFmpeg v360)
+3. PCAP → SLAM-tool conversion pipeline
+4. JSON metadata manifests
+5. Retry + recovery logic for failed captures
+
+________________________________________
+
+Lessons Learned
+
+1. SSH process handling behaves differently from local processes
+2. MP4 finalization is sensitive to premature termination
+3. Device locks persist across SSH sessions
+4. Remote debugging requires clear log dumps
+5. Good UX = fewer mistakes and faster data collection
+
+________________________________________
+
+Generated: 2025-11-16
