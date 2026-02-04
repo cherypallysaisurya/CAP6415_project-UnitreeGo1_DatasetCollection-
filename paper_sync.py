@@ -1,8 +1,6 @@
-"""
-Precise Synchronization Between LiDAR and Multiple Cameras
-Implementation of Algorithm 1 from IEEE paper (10643296)
-Adapted for indoor data (hallways, walls, furniture instead of cars/edges)
-"""
+# LiDAR-Camera Synchronization
+# Implementation of Algorithm 1 from IEEE TIV 2025 paper
+# Adapted for indoor environments
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -10,20 +8,14 @@ from pathlib import Path
 from PIL import Image
 
 
+# Adaptive time delay estimation and trigger offset correction
 class PaperSync:
-    """
-    Implements Algorithm 1: Adaptive Dynamic Time Delay Estimation
-    and Trigger Offset Correction from the paper.
-    """
     
     def __init__(self, C_intrinsic, R_t, pthr=5.0, tthr=0.001):
-        """
-        Args:
-            C_intrinsic: 3x3 camera intrinsic matrix [[fx,0,cx],[0,fy,cy],[0,0,1]]
-            R_t: 3x4 extrinsic matrix [[r11,r12,r13,tx],[r21,r22,r23,ty],[r31,r32,r33,tz]]
-            pthr: projection error threshold (pixels), paper uses ~5px
-            tthr: time error threshold (seconds), paper uses ~1ms
-        """
+        # C_intrinsic: 3x3 camera intrinsic matrix
+        # R_t: 3x4 extrinsic matrix
+        # pthr: projection error threshold (pixels)
+        # tthr: time error threshold (seconds)
         self.C_intrinsic = np.array(C_intrinsic, dtype=np.float64)
         self.R_t = np.array(R_t, dtype=np.float64)
         self.proj_matrix = self.C_intrinsic @ self.R_t  # Eq 5
@@ -35,16 +27,8 @@ class PaperSync:
         self.pd = 0.0  # current projection error
         self.td = 0.0  # current time error
     
+    # Project LiDAR points to image plane
     def project_lidar_to_image(self, Ls):
-        """
-        Project LiDAR points to image plane using Eq 5.
-        
-        Args:
-            Ls: Nx3 array of LiDAR points [[X,Y,Z], ...]
-        
-        Returns:
-            Nx2 array of projected pixel coordinates [[u,v], ...]
-        """
         if len(Ls) == 0:
             return np.array([]).reshape(0, 2)
         
@@ -153,56 +137,46 @@ class PaperSync:
             output_dir = Path(output_dir)
             output_dir.mkdir(exist_ok=True)
         
-        print("=" * 60)
-        print("Algorithm 1: Adaptive Dynamic Time Delay Estimation")
-        print("=" * 60)
+        print("Algorithm 1: Time Delay Estimation")
         
         for i, (Ls, Cf, tL, tC, is_static) in enumerate(
             zip(Ls_list, Cf_list, tL_list, tC_list, is_static_list)):
             
-            # Line 1: Trigger camera with Delta_td (in real system)
-            # Here we simulate by adjusting timestamps
+            # Adjust timestamps
             adjusted_tL = tL - self.Delta_td
             
-            # Line 2: Project Ls onto Cf
+            # Project LiDAR to camera
             projected = self.project_lidar_to_image(Ls)
             
-            # Line 3: Compute pd, td
+            # Compute errors
             if Cf_pixels_list and len(Cf_pixels_list) > i:
                 self.pd, self.td = self.compute_errors(
                     projected, Cf_pixels_list[i], adjusted_tL, tC)
             else:
-                # Simplified: just compute time error
                 self.pd = 0.0
                 self.td = self.compute_errors_simple(adjusted_tL, tC)
             
-            # Line 4-7: Static object case
+            # Check static object case
             if is_static and self.pd >= self.pthr:
                 print(f"ITER {i}: REDO CALIBRATION (pd={self.pd:.1f}px >= {self.pthr}px)")
             
-            # Line 8-11: Dynamic object case
+            # Check dynamic object case
             elif not is_static and abs(self.td) >= self.tthr:
                 self.Delta_td = np.sign(self.td) * abs(self.td)
                 print(f"ITER {i}: ADJUST Delta_td = {self.Delta_td*1000:.2f}ms")
             
-            # Print status
             print(f"ITER {i}: pd2D={self.pd:.1f}px td={self.td*1000:.2f}ms Delta_td={self.Delta_td*1000:.2f}ms")
             
-            # Visualize
             if output_dir:
                 self.visualize_projection(Cf, projected, i, output_dir)
         
-        print("=" * 60)
-        print(f"FINAL Delta_td = {self.Delta_td*1000:.2f}ms")
-        print("=" * 60)
+        print(f"Final Delta_td = {self.Delta_td*1000:.2f}ms")
         
         return self.Delta_td
 
 
+# Load sample data from dataset
 def load_sample_data(data_dir, session, num_frames=10):
-    """
-    Load sample frames and LiDAR from our indoor dataset.
-    """
     session_dir = Path(data_dir) / session
     frames_dir = session_dir / "frames"
     velodyne_dir = session_dir / "velodyne"
@@ -276,22 +250,22 @@ def main():
         [0, 0, 1]
     ])
     
-    # Extrinsic: identity rotation, small translation (LiDAR above camera)
+    # Extrinsic matrix (identity rotation, small offset for LiDAR above camera)
     R_t = np.array([
         [1, 0, 0, 0],
-        [0, 1, 0, 0.1],  # 10cm offset in Y
+        [0, 1, 0, 0.1],
         [0, 0, 1, 0]
     ])
     
-    # Create sync object
+    # Initialize sync algorithm
     sync = PaperSync(
         C_intrinsic=C_intrinsic,
         R_t=R_t,
-        pthr=5.0,   # 5 pixel threshold
-        tthr=0.001  # 1ms threshold
+        pthr=5.0,
+        tthr=0.001
     )
     
-    # Load data
+    # Load dataset
     print(f"Loading data from {SESSION}...")
     Ls_list, Cf_list, tL_list, tC_list, is_static_list = load_sample_data(
         DATA_DIR, SESSION, num_frames=10)
@@ -308,17 +282,13 @@ def main():
         output_dir=OUTPUT_DIR
     )
     
-    # Summary
-    print("\n" + "=" * 60)
-    print("SUMMARY")
-    print("=" * 60)
-    print(f"Final time delay estimate: {Delta_td*1000:.2f} ms")
+    # Print results
+    print(f"\nFinal time delay: {Delta_td*1000:.2f} ms")
     print(f"Target: |td| < 1ms, pd < 5px")
     if abs(Delta_td) < 0.001:
-        print("✅ SUCCESS: Sync within 1ms tolerance")
+        print("Success: Sync within 1ms tolerance")
     else:
-        print(f"⚠️  Sync offset detected: {Delta_td*1000:.2f}ms")
-    print("=" * 60)
+        print(f"Sync offset detected: {Delta_td*1000:.2f}ms")
 
 
 if __name__ == "__main__":

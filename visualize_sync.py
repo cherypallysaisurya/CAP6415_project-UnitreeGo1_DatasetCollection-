@@ -15,13 +15,13 @@ from PIL import Image
 
 
 def load_lidar(bin_path):
-    """Load LiDAR points from .bin file. Format: [x,y,z,intensity,return_type]"""
+    
     pts = np.fromfile(str(bin_path), dtype=np.float32).reshape(-1, 5)
     return pts[:, :3], pts[:, 3]  # xyz, intensity
 
 
 def load_image(png_path):
-    """Load camera image."""
+    
     return np.array(Image.open(png_path))
 
 
@@ -112,7 +112,7 @@ def project_lidar_to_camera(points, img_w, img_h):
 
 
 def visualize(img, projected, depths, title, save_path=None):
-    """Show LiDAR points overlaid on camera image."""
+    
     
     fig, ax = plt.subplots(figsize=(14, 8))
     

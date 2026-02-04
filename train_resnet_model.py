@@ -1,9 +1,5 @@
-"""
-ResNet Training for Camera-LiDAR Dataset
-CAP6415 Fall 2025 - Sai Surya Cherupally
-
-Trains ResNet18 to predict mean LiDAR distance from camera images.
-"""
+# ResNet Training for Camera-LiDAR Dataset
+# Trains ResNet18 to predict mean LiDAR distance from camera images
 
 import numpy as np
 from pathlib import Path
@@ -19,9 +15,8 @@ import json
 from tqdm import tqdm
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print(f"Device: {device}")
 
-# Paths
+# Data paths
 DATA_DIR = Path(r"D:\RA-Proj\CAP6415_F25_project-UnitreeGo1_DatasetCollection_Light\dataset_v2")
 OUTPUT_DIR = Path(r"D:\RA-Proj\CAP6415_F25_project-UnitreeGo1_DatasetCollection\model_results")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -29,7 +24,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 TRAIN_SESSIONS = ["4th_floor_hallway_20251206_132136"]
 TEST_SESSIONS = ["Mlab_20251207_112819"]
 
-# Training config
+# Training parameters
 BATCH_SIZE = 32
 NUM_EPOCHS = 5
 LEARNING_RATE = 0.001
@@ -38,8 +33,8 @@ EARLY_STOP_PATIENCE = 3
 IMAGE_SIZE = 224
 
 
+# Dataset class: pairs camera images with mean LiDAR distance
 class CameraLiDARDataset(Dataset):
-    """Pairs camera images with mean LiDAR distance."""
     
     def __init__(self, sessions, data_dir, transform=None):
         self.data_dir = Path(data_dir)
@@ -74,8 +69,8 @@ class CameraLiDARDataset(Dataset):
         return image, torch.tensor(target, dtype=torch.float32)
 
 
+# ResNet18 modified for regression
 class ResNetRegressor(nn.Module):
-    """ResNet18 modified for regression."""
     
     def __init__(self, pretrained=True):
         super().__init__()
@@ -135,8 +130,8 @@ def evaluate(model, dataloader, criterion):
     }
 
 
+# Save training history plots
 def plot_training_history(train_losses, val_losses, val_maes, output_dir):
-    """Save training curves."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     epochs = range(1, len(train_losses) + 1)
     
@@ -157,8 +152,8 @@ def plot_training_history(train_losses, val_losses, val_maes, output_dir):
     plt.close()
 
 
+# Save prediction visualizations
 def plot_predictions(targets, predictions, output_dir):
-    """Save prediction plots."""
     fig, axes = plt.subplots(1, 2, figsize=(12, 4))
     
     axes[0].scatter(targets, predictions, alpha=0.5, s=20)
@@ -179,11 +174,9 @@ def plot_predictions(targets, predictions, output_dir):
 
 
 def main():
-    print("=" * 50)
     print("ResNet18 Training - Camera to LiDAR Distance")
-    print("=" * 50)
     
-    # Transforms
+    # Data transforms
     train_transform = transforms.Compose([
         transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         transforms.RandomHorizontalFlip(),
@@ -197,8 +190,8 @@ def main():
         transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     
-    # Load data
-    print("\nLoading datasets...")
+    # Load datasets
+    print("Loading datasets...")
     train_dataset = CameraLiDARDataset(TRAIN_SESSIONS, DATA_DIR, train_transform)
     test_dataset = CameraLiDARDataset(TEST_SESSIONS, DATA_DIR, test_transform)
     print(f"Train: {len(train_dataset)} | Test: {len(test_dataset)}")
@@ -216,9 +209,8 @@ def main():
     optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE, weight_decay=WEIGHT_DECAY)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=3)
     
-    # Training
-    print(f"\nTraining for {NUM_EPOCHS} epochs...")
-    print("-" * 50)
+    # Start training
+    print(f"Training for {NUM_EPOCHS} epochs...")
     
     train_losses, val_losses, val_maes = [], [], []
     best_val_loss = float('inf')
@@ -254,7 +246,7 @@ def main():
             break
     
     total_time = time.time() - start_time
-    print(f"\nDone in {total_time:.1f}s")
+    print(f"Training complete in {total_time:.1f}s")
     
     # Load best model
     if best_model_state:
@@ -267,9 +259,9 @@ def main():
         'test_sessions': TEST_SESSIONS,
     }, OUTPUT_DIR / 'resnet_camera_lidar_model.pth')
     
-    # Final evaluation
+    # Final results
     final = evaluate(model, test_loader, criterion)
-    print(f"\nResults: MAE={final['mae']:.4f}m RMSE={final['rmse']:.4f}m R²={final['r2']:.4f}")
+    print(f"Results: MAE={final['mae']:.4f}m RMSE={final['rmse']:.4f}m R²={final['r2']:.4f}")
     
     # Save plots
     plot_training_history(train_losses, val_losses, val_maes, OUTPUT_DIR)
@@ -287,7 +279,7 @@ def main():
             'training_time': total_time
         }, f, indent=2)
     
-    print(f"\nSaved to {OUTPUT_DIR}")
+    print(f"Saved to {OUTPUT_DIR}")
 
 
 if __name__ == "__main__":

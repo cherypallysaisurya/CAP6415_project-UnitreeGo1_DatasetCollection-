@@ -360,7 +360,6 @@
         
         // Update status immediately on load
         updateStatus();
-
         function updateSensorSelection() {
             selectedSensor = document.getElementById('sensor-select').value;
             console.log('Selected sensor:', selectedSensor);
@@ -462,7 +461,6 @@
             const sensor = selectedSensor;
             
             if (sensor === 'both') {
-                // Use synchronized endpoint - connects to both first, then starts together
                 await sendCommand('/api/both/start', 'POST');
             } else if (sensor === 'camera') {
                 await sendCommand('/api/camera/start', 'POST');
@@ -534,9 +532,15 @@
             }
         }
 
-        async function sendCommand(endpoint, method) {
+        async function sendCommand(endpoint, method, body = null) {
             try {
-                const response = await fetch(endpoint, { method });
+                const options = { method };
+                if (body) {
+                    options.headers = { 'Content-Type': 'application/json' };
+                    options.body = JSON.stringify(body);
+                }
+                
+                const response = await fetch(endpoint, options);
                 const data = await response.json();
                 
                 if (!data.success) {

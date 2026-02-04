@@ -1,4 +1,4 @@
-"""
+﻿"""
 Unitree Go1 Data Collection Web Interface
 ==========================================
 Flask backend for remote camera and LiDAR recording control.
@@ -31,8 +31,8 @@ CONFIG = {
         "host": "192.168.123.13",
         "username": "unitree",
         "password": "123",
-        "device": "/dev/video0",
-        "resolution": "1280x720",
+        "device": "/dev/video1",
+        "resolution": "1856x800",
         "input_format": "mjpeg"
     },
     "lidar": {
@@ -113,24 +113,25 @@ def camera_start():
             ssh = create_ssh_connection(cfg["host"], cfg["username"], cfg["password"])
             camera_state["ssh"] = ssh
             
-            # Kill existing ffmpeg/mjpeg processes
+            # Kill existing processes including point_cloud_node (blocks camera)
             log_camera("Killing existing processes...")
+            run_remote_command(ssh, "pkill -f point_cloud_node 2>/dev/null || true")
             run_remote_command(ssh, "pkill -9 ffmpeg 2>/dev/null || true")
             run_remote_command(ssh, "pkill -9 mjpeg 2>/dev/null || true")
             run_remote_command(ssh, f"fuser -k {cfg['device']} 2>/dev/null || true")
-            time.sleep(1)
+            time.sleep(2)
             
             # Generate session name
             session_name = datetime.now().strftime("%Y%m%d_%H%M%S")
             camera_state["session_name"] = session_name
             
-            # Build ffmpeg command
+            # Build ffmpeg command (50fps for demo)
             remote_file = f"/home/unitree/camera_{session_name}.mp4"
             ffmpeg_cmd = (
                 f"sh -c 'sleep 2; ffmpeg -y -nostdin "
-                f"-f v4l2 -input_format {cfg['input_format']} "
-                f"-video_size {cfg['resolution']} "
-                f"-i {cfg['device']} "
+                f"-f video4linux2 -video_size {cfg['resolution']} -i {cfg['device']} "
+                f"-r 50 -pix_fmt yuv420p -c:v libx264 -preset veryfast "
+                f"-movflags +faststart "
                 f"{remote_file} >> /tmp/ffmpeg.log 2>&1 & echo $!'"
             )
             
@@ -162,12 +163,23 @@ def camera_stop():
             
             log_camera(f"Stopping recording (PID: {pid})...")
             
-            # Send SIGTERM for graceful shutdown
-            run_remote_command(ssh, f"kill -TERM {pid} 2>/dev/null || true")
-            time.sleep(4)  # Wait for file finalization
+            # Wait to compensate for SSH latency and ensure latest frames captured
+            time.sleep(2)
+            
+            # Send SIGINT for graceful shutdown
+            run_remote_command(ssh, f"kill -INT {pid} 2>/dev/null || true")
+            time.sleep(4)
             
             # Force kill if still running
             run_remote_command(ssh, f"kill -9 {pid} 2>/dev/null || true")
+            
+            # Retrieve ffmpeg logs to diagnose issues
+            log_camera("Retrieving ffmpeg logs...")
+            ffmpeg_log, _ = run_remote_command(ssh, "tail -30 /tmp/ffmpeg.log 2>/dev/null")
+            if ffmpeg_log:
+                for line in ffmpeg_log.split('\n')[-10:]:  # Last 10 lines
+                    if line.strip():
+                        log_camera(f"FFMPEG: {line.strip()}")
             
             camera_state["recording"] = False
             camera_state["pid"] = None
@@ -218,10 +230,7 @@ def camera_save():
             # Verify local file
             if local_file.exists() and local_file.stat().st_size > 0:
                 log_camera(f"Saved: {local_file.name} ({local_file.stat().st_size} bytes)")
-                
-                # Delete from robot
-                log_camera("Cleaning up robot...")
-                run_remote_command(ssh, f"rm -f {remote_file}")
+                log_camera("File kept on robot for verification")
                 
                 camera_state["session_name"] = None
                 return {"success": True, "message": f"Saved {local_file.name}"}
