@@ -33,6 +33,7 @@ CONFIG = {
         "password": "123",
         "device": "/dev/video1",
         "resolution": "1856x800",
+        "framerate": "50",
         "input_format": "mjpeg"
     },
     "lidar": {
@@ -74,15 +75,15 @@ def log_camera(msg):
     """Add message to camera log."""
     timestamp = datetime.now().strftime("%H:%M:%S")
     camera_state["log"].append(f"[{timestamp}] {msg}")
-    if len(camera_state["log"]) > 50:
-        camera_state["log"] = camera_state["log"][-50:]
+    if len(camera_state["log"]) > 500:
+        camera_state["log"] = camera_state["log"][-500:]
 
 def log_lidar(msg):
     """Add message to LiDAR log."""
     timestamp = datetime.now().strftime("%H:%M:%S")
     lidar_state["log"].append(f"[{timestamp}] {msg}")
-    if len(lidar_state["log"]) > 50:
-        lidar_state["log"] = lidar_state["log"][-50:]
+    if len(lidar_state["log"]) > 500:
+        lidar_state["log"] = lidar_state["log"][-500:]
 
 def create_ssh_connection(host, username, password):
     """Create SSH connection to robot."""
@@ -113,25 +114,27 @@ def camera_start():
             ssh = create_ssh_connection(cfg["host"], cfg["username"], cfg["password"])
             camera_state["ssh"] = ssh
             
-            # Kill existing processes including point_cloud_node (blocks camera)
+            # Kill existing ffmpeg/mjpeg processes
             log_camera("Killing existing processes...")
-            run_remote_command(ssh, "pkill -f point_cloud_node 2>/dev/null || true")
             run_remote_command(ssh, "pkill -9 ffmpeg 2>/dev/null || true")
             run_remote_command(ssh, "pkill -9 mjpeg 2>/dev/null || true")
             run_remote_command(ssh, f"fuser -k {cfg['device']} 2>/dev/null || true")
-            time.sleep(2)
+            time.sleep(1)
             
             # Generate session name
             session_name = datetime.now().strftime("%Y%m%d_%H%M%S")
             camera_state["session_name"] = session_name
             
-            # Build ffmpeg command (50fps for demo)
-            remote_file = f"/home/unitree/camera_{session_name}.mp4"
+            # Build ffmpeg command - RECORD RAW MJPEG (no encoding stress)
+            remote_file = f"/home/unitree/camera_{session_name}.mjpeg"
+            camera_state["raw_file"] = remote_file
+            
             ffmpeg_cmd = (
-                f"sh -c 'sleep 2; ffmpeg -y -nostdin "
-                f"-f video4linux2 -video_size {cfg['resolution']} -i {cfg['device']} "
-                f"-r 50 -pix_fmt yuv420p -c:v libx264 -preset veryfast "
-                f"-movflags +faststart "
+                f"sh -c 'ffmpeg -y -nostdin "
+                f"-f v4l2 -input_format {cfg['input_format']} "
+                f"-video_size {cfg['resolution']} "
+                f"-i {cfg['device']} "
+                f"-c:v copy "
                 f"{remote_file} >> /tmp/ffmpeg.log 2>&1 & echo $!'"
             )
             
@@ -142,6 +145,20 @@ def camera_start():
                 camera_state["pid"] = stdout.strip()
                 camera_state["recording"] = True
                 log_camera(f"Recording started (PID: {camera_state['pid']})")
+                
+                # Check if ffmpeg is actually running after 3 seconds
+                time.sleep(3)
+                check_ps, _ = run_remote_command(ssh, f"ps -p {camera_state['pid']} -o comm=")
+                if "ffmpeg" not in (check_ps or ""):
+                    log_camera("⚠ ffmpeg died immediately - checking logs...")
+                    logs, _ = run_remote_command(ssh, "tail -30 /tmp/ffmpeg.log 2>/dev/null")
+                    if logs:
+                        for line in logs.split('\n')[-15:]:
+                            if line.strip():
+                                log_camera(f"FFMPEG: {line.strip()}")
+                else:
+                    log_camera("✓ ffmpeg confirmed running")
+                
                 return {"success": True, "message": "Recording started"}
             else:
                 log_camera(f"Failed to start: {stderr}")
@@ -163,23 +180,12 @@ def camera_stop():
             
             log_camera(f"Stopping recording (PID: {pid})...")
             
-            # Wait to compensate for SSH latency and ensure latest frames captured
-            time.sleep(2)
-            
-            # Send SIGINT for graceful shutdown
-            run_remote_command(ssh, f"kill -INT {pid} 2>/dev/null || true")
-            time.sleep(4)
+            # Send SIGTERM for graceful shutdown
+            run_remote_command(ssh, f"kill -TERM {pid} 2>/dev/null || true")
+            time.sleep(4)  # Wait for file finalization
             
             # Force kill if still running
             run_remote_command(ssh, f"kill -9 {pid} 2>/dev/null || true")
-            
-            # Retrieve ffmpeg logs to diagnose issues
-            log_camera("Retrieving ffmpeg logs...")
-            ffmpeg_log, _ = run_remote_command(ssh, "tail -30 /tmp/ffmpeg.log 2>/dev/null")
-            if ffmpeg_log:
-                for line in ffmpeg_log.split('\n')[-10:]:  # Last 10 lines
-                    if line.strip():
-                        log_camera(f"FFMPEG: {line.strip()}")
             
             camera_state["recording"] = False
             camera_state["pid"] = None
@@ -205,11 +211,11 @@ def camera_save():
             session_name = camera_state["session_name"]
             cfg = CONFIG["camera"]
             
-            remote_file = f"/home/unitree/camera_{session_name}.mp4"
+            remote_raw_file = camera_state.get("raw_file", f"/home/unitree/camera_{session_name}.mjpeg")
             
             # Verify file exists
-            log_camera("Verifying file...")
-            stdout, _ = run_remote_command(ssh, f"ls -lh {remote_file}")
+            log_camera("Verifying raw file...")
+            stdout, _ = run_remote_command(ssh, f"ls -lh {remote_raw_file}")
             if not stdout:
                 log_camera("File not found on robot")
                 return {"success": False, "message": "File not found"}
@@ -219,21 +225,40 @@ def camera_save():
             # Create local directory
             local_dir = Path(CONFIG["output_directory"]) / "camera"
             local_dir.mkdir(parents=True, exist_ok=True)
-            local_file = local_dir / f"camera_{session_name}.mp4"
+            local_raw_file = local_dir / f"camera_{session_name}.mjpeg"
+            local_mp4_file = local_dir / f"camera_{session_name}.mp4"
             
-            # Transfer via SFTP
-            log_camera("Transferring file...")
+            # Transfer MJPEG via SFTP
+            log_camera("Transferring MJPEG...")
             sftp = ssh.open_sftp()
-            sftp.get(remote_file, str(local_file))
+            sftp.get(remote_raw_file, str(local_raw_file))
             sftp.close()
             
+            # Convert to MP4 locally
+            log_camera("Converting MJPEG → MP4...")
+            import subprocess
+            convert_cmd = [
+                'ffmpeg', '-y', '-i', str(local_raw_file),
+                '-c:v', 'copy',
+                str(local_mp4_file)
+            ]
+            result = subprocess.run(convert_cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                log_camera(f"Conversion failed: {result.stderr[:200]}")
+                return {"success": False, "message": "MP4 conversion failed"}
+            
+            log_camera("✓ MP4 created")
+            
             # Verify local file
-            if local_file.exists() and local_file.stat().st_size > 0:
-                log_camera(f"Saved: {local_file.name} ({local_file.stat().st_size} bytes)")
-                log_camera("File kept on robot for verification")
+            if local_mp4_file.exists() and local_mp4_file.stat().st_size > 0:
+                log_camera(f"Saved: {local_mp4_file.name} ({local_mp4_file.stat().st_size} bytes)")
+                
+                # Delete from robot
+                log_camera("Cleaning up robot...")
+                run_remote_command(ssh, f"rm -f {remote_raw_file}")
                 
                 camera_state["session_name"] = None
-                return {"success": True, "message": f"Saved {local_file.name}"}
+                return {"success": True, "message": f"Saved {local_mp4_file.name}"}
             else:
                 log_camera("Transfer failed - empty file")
                 return {"success": False, "message": "Transfer failed"}
@@ -270,10 +295,10 @@ def lidar_start():
             
             # Build tcpdump command
             remote_file = f"/home/unitree/lidar_{session_name}.pcap"
+            lidar_state["remote_file"] = remote_file
             ports = " or ".join([f"udp port {p}" for p in cfg["ports"]])
             tcpdump_cmd = (
-                f"sudo tcpdump -i eth0 -w {remote_file} {ports} &"
-                f" echo $!"
+                f"sh -c 'echo {cfg['password']} | sudo -S tcpdump -i eth0 -B 16384 -w {remote_file} {ports} >> /tmp/tcpdump.log 2>&1 & echo $!'"
             )
             
             log_lidar("Starting tcpdump...")
